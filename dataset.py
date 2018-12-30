@@ -91,9 +91,9 @@ class KITTIOdometry(object):   # without lidar
 
         path = os.path.expanduser(path)
         timestamps = np.loadtxt(os.path.join(path, 'times.txt'))
-        self.left = ImageReader(self.listdir(os.path.join(path, 'image_2')), 
+        self.left = ImageReader(self.listdir(os.path.join(path, 'image_0')), 
             timestamps)
-        self.right = ImageReader(self.listdir(os.path.join(path, 'image_3')), 
+        self.right = ImageReader(self.listdir(os.path.join(path, 'image_1')), 
             timestamps)
 
         assert len(self.left) == len(self.right)

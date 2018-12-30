@@ -4,7 +4,7 @@ import cv2
 
 class Params(object):
     def __init__(self):
-        
+
         self.pnp_min_measurements = 10
         self.pnp_max_iterations = 10
         self.init_min_points = 10
@@ -29,13 +29,13 @@ class Params(object):
 
 
 class ParamsEuroc(Params):
-    
+
     def __init__(self, config='GFTT-BRIEF'):
         super().__init__()
 
         if config == 'GFTT-BRIEF':
             self.feature_detector = cv2.GFTTDetector_create(
-                maxCorners=1000, minDistance=15.0, 
+                maxCorners=1000, minDistance=15.0,
                 qualityLevel=0.001, useHarrisDetector=False)
 
             self.descriptor_extractor = cv2.xfeatures2d.BriefDescriptorExtractor_create(
@@ -47,7 +47,7 @@ class ParamsEuroc(Params):
 
             self.descriptor_extractor = cv2.xfeatures2d.BriefDescriptorExtractor_create(
                 bytes=32, use_orientation=False)
-            
+
         else:
             raise NotImplementedError
 
@@ -72,8 +72,8 @@ class ParamsEuroc(Params):
         self.view_viewpoint_z = -10
         self.view_viewpoint_f = 2000
 
-    
-        
+
+
 
 class ParamsKITTI(Params):
     def __init__(self, config='GFTT-BRIEF'):
@@ -81,7 +81,7 @@ class ParamsKITTI(Params):
 
         if config == 'GFTT-BRIEF':
             self.feature_detector = cv2.GFTTDetector_create(
-                maxCorners=1000, minDistance=12.0, 
+                maxCorners=1000, minDistance=12.0,
                 qualityLevel=0.001, useHarrisDetector=False)
 
             self.descriptor_extractor = cv2.xfeatures2d.BriefDescriptorExtractor_create(
@@ -89,7 +89,7 @@ class ParamsKITTI(Params):
 
         elif config == 'GFTT-BRISK':
             self.feature_detector = cv2.GFTTDetector_create(
-                maxCorners=2000, minDistance=15.0, 
+                maxCorners=2000, minDistance=15.0,
                 qualityLevel=0.01, useHarrisDetector=False)
 
             self.descriptor_extractor = cv2.BRISK_create()
@@ -110,6 +110,57 @@ class ParamsKITTI(Params):
 
         self.frustum_near = 0.1    # meters
         self.frustum_far = 1000.0
+
+        self.ground = True
+
+        self.lc_max_inbetween_distance = 50
+        self.lc_distance_threshold = 15
+        self.lc_embedding_distance = 20.0
+
+        self.view_image_width = 400
+        self.view_image_height = 130
+        self.view_camera_width = 0.75
+        self.view_viewpoint_x = 0
+        self.view_viewpoint_y = -500   # -10
+        self.view_viewpoint_z = -100   # -0.1
+        self.view_viewpoint_f = 2000
+
+
+class ParamsBlueROV(Params):
+    def __init__(self, config='GFTT-BRIEF'):
+        super().__init__()
+
+        if config == 'GFTT-BRIEF':
+            self.feature_detector = cv2.GFTTDetector_create(
+                maxCorners=1000, minDistance=12.0,
+                qualityLevel=0.001, useHarrisDetector=False)
+
+            self.descriptor_extractor = cv2.xfeatures2d.BriefDescriptorExtractor_create(
+                bytes=32, use_orientation=False)
+
+        elif config == 'GFTT-BRISK':
+            self.feature_detector = cv2.GFTTDetector_create(
+                maxCorners=2000, minDistance=15.0,
+                qualityLevel=0.01, useHarrisDetector=False)
+
+            self.descriptor_extractor = cv2.BRISK_create()
+
+        elif config == 'ORB-ORB':
+            self.feature_detector = cv2.ORB_create(
+                nfeatures=1000, scaleFactor=1.2, nlevels=1, edgeThreshold=31)
+            self.descriptor_extractor = self.feature_detector
+
+        else:
+            raise NotImplementedError
+
+        self.descriptor_matcher = cv2.BFMatcher(cv2.NORM_HAMMING, crossCheck=False)
+
+        self.matching_cell_size = 15   # pixels
+        self.matching_neighborhood = 3
+        self.matching_distance = 30
+
+        self.frustum_near = 0.001    # meters
+        self.frustum_far = 50.0
 
         self.ground = True
 

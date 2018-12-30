@@ -16,7 +16,7 @@ from covisibility import GraphMeasurement
 
 
 class Camera(object):
-    def __init__(self, fx, fy, cx, cy, width, height, 
+    def __init__(self, fx, fy, cx, cy, width, height,
             frustum_near, frustum_far, baseline):
         self.fx = fx
         self.fy = fy
@@ -25,8 +25,8 @@ class Camera(object):
         self.baseline = baseline
 
         self.intrinsic = np.array([
-            [fx, 0, cx], 
-            [0, fy, cy], 
+            [fx, 0, cx],
+            [0, fy, cy],
             [0, 0, 1]])
 
         self.frustum_near = frustum_near
@@ -34,7 +34,7 @@ class Camera(object):
 
         self.width = width
         self.height = height
-        
+
     def compute_right_camera_pose(self, pose):
         pos = pose * np.array([self.baseline, 0, 0])
         return g2o.Isometry3d(pose.orientation(), pos)
@@ -42,7 +42,7 @@ class Camera(object):
 
 
 class Frame(object):
-    def __init__(self, idx, pose, feature, cam, timestamp=None, 
+    def __init__(self, idx, pose, feature, cam, timestamp=None,
             pose_covariance=np.identity(6)):
         self.idx = idx
         self.pose = pose    # g2o.Isometry3d
@@ -50,7 +50,7 @@ class Frame(object):
         self.cam = cam
         self.timestamp = timestamp
         self.image = feature.image
-        
+
         self.orientation = pose.orientation()
         self.position = pose.position()
         self.pose_covariance = pose_covariance
@@ -79,13 +79,13 @@ class Frame(object):
                 v >= - margin,
                 v <= self.cam.height + margin])
 
-        
+
     def update_pose(self, pose):
         if isinstance(pose, g2o.SE3Quat):
             self.pose = g2o.Isometry3d(pose.orientation(), pose.position())
         else:
-            self.pose = pose   
-        self.orientation = self.pose.orientation()  
+            self.pose = pose
+        self.orientation = self.pose.orientation()
         self.position = self.pose.position()
 
         self.transform_matrix = self.pose.inverse().matrix()[:3]
@@ -105,7 +105,7 @@ class Frame(object):
             t = self.transform_matrix[:3, 3:]
         return R.dot(points) + t
 
-    def project(self, points): 
+    def project(self, points):
         '''
         Project points from camera frame to image's pixel coordinates.
         Args:
@@ -144,18 +144,18 @@ class Frame(object):
 
 
 class StereoFrame(Frame):
-    def __init__(self, idx, pose, feature, right_feature, cam, 
+    def __init__(self, idx, pose, feature, right_feature, cam,
             right_cam=None, timestamp=None, pose_covariance=np.identity(6)):
 
         super().__init__(idx, pose, feature, cam, timestamp, pose_covariance)
         self.left  = Frame(idx, pose, feature, cam, timestamp, pose_covariance)
-        self.right = Frame(idx, 
-            cam.compute_right_camera_pose(pose), 
-            right_feature, right_cam or cam, 
+        self.right = Frame(idx,
+            cam.compute_right_camera_pose(pose),
+            right_feature, right_cam or cam,
             timestamp, pose_covariance)
 
     def find_matches(self, source, points, descriptors):
-        
+
         q2 = Queue()
         def find_right(points, descriptors, q):
             m = dict(self.right.find_matches(points, descriptors))
@@ -179,7 +179,7 @@ class StereoFrame(Frame):
                 meas = Measurement(
                     Measurement.Type.STEREO,
                     source,
-                    [self.left.get_keypoint(j), 
+                    [self.left.get_keypoint(j),
                         self.right.get_keypoint(j2)],
                     [self.left.get_descriptor(j),
                         self.right.get_descriptor(j2)])
@@ -213,7 +213,11 @@ class StereoFrame(Frame):
         for mappoint in mappoints:
             points.append(mappoint.position)
             descriptors.append(mappoint.descriptor)
-        matched_measurements = self.find_matches(source, points, descriptors)
+        if len(points)>0:
+            matched_measurements = self.find_matches(source, points, descriptors)
+        else:
+            matched_measurements=[]
+            print('no match messurments')
 
         measurements = []
         for i, meas in matched_measurements:
@@ -224,7 +228,6 @@ class StereoFrame(Frame):
     def triangulate(self):
         kps_left, desps_left, idx_left = self.left.get_unmatched_keypoints()
         kps_right, desps_right, idx_right = self.right.get_unmatched_keypoints()
-
         mappoints, matches = self.triangulate_points(
             kps_left, desps_left, kps_right, desps_right)
 
@@ -253,18 +256,23 @@ class StereoFrame(Frame):
         px_right = np.array([kps_right[m.trainIdx].pt for m in matches])
 
         points = cv2.triangulatePoints(
-            self.left.projection_matrix, 
-            self.right.projection_matrix, 
-            px_left.transpose(), 
-            px_right.transpose() 
+            self.left.projection_matrix,
+            self.right.projection_matrix,
+            px_left.transpose(),
+            px_right.transpose()
             ).transpose()  # shape: (N, 4)
 
         points = points[:, :3] / points[:, 3:]
 
-        can_view = np.logical_and(
-            self.left.can_view(points), 
-            self.right.can_view(points))
 
+        can_view = np.logical_and(
+            self.left.can_view(points),
+            self.right.can_view(points))
+        print('--- triangulate',len(points),np.count_nonzero(can_view))
+        if 0 and np.count_nonzero(can_view)==0:
+            import pdb;pdb.set_trace()
+            self.left.can_view(points)
+            print(px_left,px_right)
         mappoints = []
         matchs = []
         for i, point in enumerate(points):
@@ -304,16 +312,16 @@ class StereoFrame(Frame):
         parallel = np.arccos(cos) < (np.pi / 4)
 
         can_view = np.logical_or(
-            self.left.can_view(points), 
+            self.left.can_view(points),
             self.right.can_view(points))
 
         return np.logical_and(parallel, can_view)
 
     def to_keyframe(self):
         return KeyFrame(
-            self.idx, self.pose, 
-            self.left.feature, self.right.feature, 
-            self.cam, self.right.cam, 
+            self.idx, self.pose,
+            self.left.feature, self.right.feature,
+            self.cam, self.right.cam,
             self.pose_covariance)
 
 
@@ -366,8 +374,8 @@ class MapPoint(GraphMapPoint):
     _id = 0
     _id_lock = Lock()
 
-    def __init__(self, position, normal, descriptor, 
-            color=np.zeros(3), 
+    def __init__(self, position, normal, descriptor,
+            color=np.zeros(3),
             covariance=np.identity(3) * 1e-4):
         super().__init__()
 
@@ -416,10 +424,10 @@ class MapPoint(GraphMapPoint):
         with self._lock:
             self.count['meas'] += 1
 
-    
+
 
 class Measurement(GraphMeasurement):
-    
+
     Source = Enum('Measurement.Source', ['TRIANGULATION', 'TRACKING', 'REFIND'])
     Type = Enum('Measurement.Type', ['STEREO', 'LEFT', 'RIGHT'])
 
